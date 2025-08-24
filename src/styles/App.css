@@ -1,0 +1,296 @@
+/* Mobile-first responsive design */
+* {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background-color: #f8fafc;
+  }
+  
+  .app-container {
+    min-height: 100vh;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Navigation */
+  .nav-tabs {
+    display: flex;
+    background: white;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  
+  .nav-tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    color: #64748b;
+  }
+  
+  .nav-tab.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+    background-color: #f1f5f9;
+  }
+  
+  .nav-tab:hover {
+    background-color: #f8fafc;
+  }
+  
+  /* Cards and containers */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+  }
+  
+  .scan-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  .scan-video {
+    width: 100%;
+    height: 300px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: #000;
+  }
+  
+  .scan-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #2563eb;
+    border-radius: 12px;
+    pointer-events: none;
+  }
+  
+  /* Buttons */
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+  }
+  
+  .btn-success {
+    background: #22c55e;
+    color: white;
+  }
+  
+  .btn-success:hover:not(:disabled) {
+    background: #16a34a;
+  }
+  
+  .btn-warning {
+    background: #f59e0b;
+    color: white;
+  }
+  
+  .btn-warning:hover:not(:disabled) {
+    background: #d97706;
+  }
+  
+  .btn-danger {
+    background: #ef4444;
+    color: white;
+  }
+  
+  .btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+  }
+  
+  .btn-secondary {
+    background: #64748b;
+    color: white;
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: #475569;
+  }
+  
+  /* Forms */
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.2s ease;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  
+  .form-checkbox {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+  
+  /* Item display */
+  .item-display {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    border-left: 4px solid #2563eb;
+  }
+  
+  .item-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+  }
+  
+  .item-detail {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+  
+  /* Count list */
+  .count-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .count-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  
+  .count-item:last-child {
+    border-bottom: none;
+  }
+  
+  .count-item-info {
+    flex: 1;
+  }
+  
+  .count-item-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  /* Responsive design */
+  @media (max-width: 640px) {
+    .card {
+      margin: 8px;
+      padding: 16px;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    
+    .scan-video {
+      height: 250px;
+    }
+  }
+  
+  @media (min-width: 768px) {
+    .app-container {
+      max-width: 768px;
+      margin: 0 auto;
+    }
+  }
+  
+  /* Loading states */
+  .loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  
+  .spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2563eb;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Error states */
+  .error-message {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    margin: 16px 0;
+  }
+  
+  .success-message {
+    background: #f0fdf4;
+    color: #16a34a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #bbf7d0;
+    margin: 16px 0;
+  }
+  
