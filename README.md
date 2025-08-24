@@ -26,9 +26,20 @@ A Progressive Web Application (PWA) for barcode shelf label printing and invento
 - Node.js 16+ 
 - npm or yarn
 
-### Installation
+## Setup
 
-1. **Extract the project files** to a folder
-2. **Install dependencies**:
-   ```bash
+1. **Clone the repo:**
+   ```sh
+   git clone <your-repo-url>
+   cd Shelf_label_printing_Inventory
+   ```
+
+2. **Install dependencies:**
+   ```sh
    npm install
+   ```
+
+3. **Start the app:**
+   ```sh
+   npm run dev
+   ```
