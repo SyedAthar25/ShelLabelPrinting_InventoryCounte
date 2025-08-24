@@ -30,7 +30,7 @@ A Progressive Web Application (PWA) for barcode shelf label printing and invento
 
 1. **Clone the repo:**
    ```sh
-   git clone <your-repo-url>
+   git clone https://github.com/SyedAthar25/ShelLabelPrinting_InventoryCounte.git
    cd Shelf_label_printing_Inventory
    ```
 
@@ -43,3 +43,4 @@ A Progressive Web Application (PWA) for barcode shelf label printing and invento
    ```sh
    npm run dev
    ```
+
