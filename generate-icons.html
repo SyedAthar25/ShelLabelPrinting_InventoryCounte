@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate PWA Icons</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .icon-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .icon-preview {
+            display: inline-block;
+            margin: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .icon-preview img {
+            display: block;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .download-btn {
+            background: #2196f3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .download-btn:hover {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>PWA Icon Generator for Shelf Label Printing</h1>
+    
+    <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Right-click on each icon below</li>
+            <li>Select "Save image as..."</li>
+            <li>Save with the correct filename (e.g., icon-192x192.png)</li>
+            <li>Place all icons in the <code>public/icons/</code> folder</li>
+        </ol>
+    </div>
+
+    <div class="icon-container">
+        <h3>Required PWA Icons:</h3>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 72px; height: 72px; object-fit: contain;">
+            <p>72x72</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 96px; height: 96px; object-fit: contain;">
+            <p>96x96</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 128px; height: 128px; object-fit: contain;">
+            <p>128x128</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 144px; height: 144px; object-fit: contain;">
+            <p>144x144</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 152px; height: 152px; object-fit: contain;">
+            <p>152x152</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 192px; height: 192px; object-fit: contain;">
+            <p>192x192</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 384px; height: 384px; object-fit: contain;">
+            <p>384x384</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 512px; height: 512px; object-fit: contain;">
+            <p>512x512</p>
+        </div>
+    </div>
+
+    <div class="icon-container">
+        <h3>Additional Icons:</h3>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 16px; height: 16px; object-fit: contain;">
+            <p>16x16 (favicon)</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 32px; height: 32px; object-fit: contain;">
+            <p>32x32 (favicon)</p>
+        </div>
+        
+        <div class="icon-preview">
+            <img src="Logo 6x1-Photoroom.png" alt="Logo" style="width: 180px; height: 180px; object-fit: contain;">
+            <p>180x180 (Apple touch)</p>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <h3>Next Steps:</h3>
+        <ol>
+            <li>Save all the icons above to your <code>public/icons/</code> folder</li>
+            <li>Restart your development server</li>
+            <li>Open Chrome DevTools → Application → Manifest to verify</li>
+            <li>Test the install prompt on mobile devices</li>
+        </ol>
+    </div>
+
+    <script>
+        // Add download functionality
+        document.querySelectorAll('.icon-preview img').forEach((img, index) => {
+            const sizes = [72, 96, 128, 144, 152, 192, 384, 512, 16, 32, 180];
+            const size = sizes[index];
+            
+            img.addEventListener('click', () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // Create a white background
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, size, size);
+                
+                // Draw the logo
+                ctx.drawImage(img, 0, 0, size, size);
+                
+                // Download the image
+                const link = document.createElement('a');
+                link.download = `icon-${size}x${size}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+            
+            img.style.cursor = 'pointer';
+            img.title = `Click to download ${size}x${size} icon`;
+        });
+    </script>
+</body>
+</html>

@@ -21,6 +21,8 @@ export const InventoryCount: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState(''); // Add feedback state
+  const [showScanner, setShowScanner] = useState(true); // New state to control scanner visibility
 
   const handleRefresh = () => {
     setSearchInput('');
@@ -29,12 +31,14 @@ export const InventoryCount: React.FC = () => {
     setQuantity('');
     setError('');
     setSuccess('');
+    setShowScanner(true); // Show scanner again when refreshing
     // Optionally reset session if you want to clear all items
     // setCurrentSession({ id: Date.now().toString(), date: new Date().toISOString(), items: [], synced: false });
   };
 
-  const handleSearch = async () => {
-    if (!searchInput.trim()) return;
+  const handleSearch = async (searchTerm?: string) => {
+    const termToSearch = searchTerm || searchInput.trim();
+    if (!termToSearch) return;
     setShowSuggestions(false);
 
     setIsLoading(true);
@@ -42,12 +46,12 @@ export const InventoryCount: React.FC = () => {
     try {
       let item: Item | undefined;
 
-      if (searchInput.length >= 8) {
-        item = await dbService.getItemByBarcode(searchInput);
+      if (termToSearch.length >= 8) {
+        item = await dbService.getItemByBarcode(termToSearch);
       }
 
       if (!item) {
-        item = await dbService.getItemByCode(searchInput);
+        item = await dbService.getItemByCode(termToSearch);
       }
 
       if (item) {
@@ -73,7 +77,18 @@ export const InventoryCount: React.FC = () => {
 
   const handleBarcodeDetected = (barcode: string) => {
     setSearchInput(barcode);
-    setTimeout(() => handleSearch(), 100);
+    setError(''); // Clear any previous errors
+    setFeedback('Barcode detected! Searching for item...'); // Show immediate feedback
+    setShowScanner(false); // Hide the scanner
+    // Call search with the barcode directly
+    handleSearch(barcode);
+    // Clear the feedback message after search completes and focus on quantity input
+    setTimeout(() => {
+      setFeedback('');
+      // Auto-focus on quantity input for better UX
+      const quantityInput = document.querySelector('input[type="number"]') as HTMLInputElement;
+      if (quantityInput) quantityInput.focus();
+    }, 2000);
   };
 
   const handleAddCount = () => {
@@ -173,113 +188,137 @@ export const InventoryCount: React.FC = () => {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6">Inventory Count</h2>
-      <button className="btn btn-secondary mb-4" onClick={handleRefresh}>
-        Refresh
-      </button>
+      <div className="flex items-center mb-6 gap-2">
+        <h2 className="text-2xl font-bold m-0">Inventory Count</h2>
+        <button onClick={handleRefresh} className="p-2 ml-2 text-blue-600 hover:text-blue-800 focus:outline-none" title="Refresh">
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
 
       {/* Search Input */}
-      <div className="card">
-        <div className="form-group relative">
-          <label className="form-label">Scan barcode or enter item code:</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchInput(value);
-                setShowSuggestions(true);
-                if (value === '') {
-                  setCurrentItem(null);
-                  setQuantity('');
-                  setError('');
-                  setSuccess('');
-                  setShowSuggestions(false);
-                }
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Scan or enter barcode/item code"
-              className="form-input flex-1"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={isLoading || !searchInput.trim()}
-              className="btn btn-primary"
-            >
-              {isLoading ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-          
-          {/* Search Suggestions */}
-          <SearchSuggestions
-            query={searchInput}
-            showSuggestions={showSuggestions}
-            onItemSelect={(item) => {
-              setCurrentItem(item);
-              setSearchInput(item.itemCode);
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSearchInput(value);
+            setShowSuggestions(true);
+            if (value === '') {
+              setCurrentItem(null);
+              setQuantity('');
+              setError('');
+              setSuccess('');
               setShowSuggestions(false);
-            }}
-          />
-        </div>
+            }
+          }}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Enter barcode/item code/Item Name"
+          className="form-input flex-1"
+          disabled={isLoading}
+        />
+        <button
+          onClick={() => handleSearch()}
+          disabled={isLoading || !searchInput.trim()}
+          className="btn btn-primary flex items-center justify-center p-2"
+          style={{ minWidth: 36, minHeight: 36 }}
+        >
+          {isLoading ? (
+            <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /> </svg>
+          ) : (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" /><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          )}
+        </button>
+      </div>
+      
+      <SearchSuggestions
+        query={searchInput}
+        showSuggestions={showSuggestions}
+        onItemSelect={(item) => {
+          setCurrentItem(item);
+          setSearchInput(item.itemCode);
+          setShowSuggestions(false);
+        }}
+      />
 
-        {/* Barcode Scanner */}
-        <details className="mt-4">
-          <summary className="cursor-pointer font-semibold text-blue-600">
-            Use Camera Scanner
-          </summary>
-          <div className="mt-2">
+      {/* Barcode Scanner - minimal space */}
+      {showScanner && (
+        <details className="mb-2">
+          <summary className="cursor-pointer font-semibold text-blue-600">Use Camera Scanner</summary>
+          <div className="mt-1">
             <BarcodeScanner
               onBarcodeDetected={handleBarcodeDetected}
               onError={setError}
+              isVisible={showScanner}
             />
           </div>
         </details>
-      </div>
+      )}
+      {!showScanner && (
+        <div className="mb-2">
+          <button 
+            onClick={() => setShowScanner(true)} 
+            className="btn btn-secondary text-sm"
+          >
+            📷 Scan Another Item
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
-        <div className="error-message">
-          {error}
-        </div>
+        <div className="error-message mb-2">{error}</div>
       )}
 
       {/* Success Message */}
       {success && (
-        <div className="success-message">
-          {success}
-        </div>
+        <div className="success-message mb-2">{success}</div>
       )}
 
-      {/* Item Display and Count Input */}
-      {currentItem && (
-        <div className="space-y-4">
-          <ItemCard item={currentItem} />
+      {/* Feedback Message */}
+      {feedback && !error && (
+        <div className="success-message mb-2">{feedback}</div>
+      )}
 
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-4">Enter Count</h3>
-            
-            <div className="form-group">
-              <label className="form-label">Quantity:</label>
+      {/* Item Display and Count Input - Compact Layout */}
+      {currentItem && (
+        <div className="flex flex-col items-center w-full">
+          {/* Item Info - Compact */}
+          <div className="w-full mb-2 p-3 bg-gray-50 rounded-lg">
+            <div className="text-center">
+              <div className="font-semibold text-lg">{currentItem.itemNameEng}</div>
+              <div className="text-sm text-gray-600">{currentItem.itemCode}</div>
+              {currentItem.itemNameArabic && (
+                <div className="text-sm text-gray-600 mt-1">{currentItem.itemNameArabic}</div>
+              )}
+            </div>
+          </div>
+
+          {/* Quantity Input and Quick Add - Compact */}
+          <div className="w-full mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium">Quantity:</label>
               <input
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 min="0"
-                className="form-input"
+                className="form-input flex-1"
                 placeholder="Enter quantity"
+                style={{ fontSize: 15, padding: '4px 8px', height: 32 }}
               />
             </div>
-
-            <div className="flex gap-2 mb-4">
-              <button onClick={() => handleQuickAdd(1)} className="btn btn-secondary flex-1">
+            
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => handleQuickAdd(1)} className="btn btn-secondary flex-1 text-sm py-1">
                 +1
               </button>
-              <button onClick={() => handleQuickAdd(5)} className="btn btn-secondary flex-1">
+              <button onClick={() => handleQuickAdd(5)} className="btn btn-secondary flex-1 text-sm py-1">
                 +5
               </button>
-              <button onClick={() => handleQuickAdd(10)} className="btn btn-secondary flex-1">
+              <button onClick={() => handleQuickAdd(10)} className="btn btn-secondary flex-1 text-sm py-1">
                 +10
               </button>
             </div>
@@ -295,56 +334,57 @@ export const InventoryCount: React.FC = () => {
         </div>
       )}
 
-      {/* Session Summary */}
+      {/* Session Summary - Compact */}
       {currentSession.items.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg font-semibold mb-4">
-            Current Session: {uniqueItems} items, {totalItems} total count
-          </h3>
+        <div className="w-full">
+          <div className="flex items-center justify-between mb-2 p-2 bg-blue-50 rounded">
+            <span className="font-semibold text-sm">
+              Session: {uniqueItems} items, {totalItems} total
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSync}
+                disabled={isLoading || currentSession.synced}
+                className="btn btn-primary text-xs px-2 py-1"
+              >
+                {isLoading ? 'Syncing...' : 'Sync'}
+              </button>
+              <button
+                onClick={handleExport}
+                className="btn btn-warning text-xs px-2 py-1"
+              >
+                Export
+              </button>
+            </div>
+          </div>
 
-          <div className="count-list">
+          <div className="max-h-60 overflow-y-auto">
             {currentSession.items.map((item, index) => (
-              <div key={item.itemId} className="count-item">
-                <div className="count-item-info">
-                  <div className="font-semibold">{item.itemName}</div>
-                  <div className="text-sm text-gray-600">
-                    Code: {item.itemCode} | Qty: {item.quantity}
+              <div key={item.itemId} className="flex items-center justify-between p-2 border-b border-gray-200">
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{item.itemName}</div>
+                  <div className="text-xs text-gray-600">
+                    {item.itemCode} | Qty: {item.quantity}
                   </div>
                 </div>
-                <div className="count-item-actions">
-                  <span className="text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">
                     {new Date(item.timestamp).toLocaleTimeString()}
                   </span>
                   <button
                     onClick={() => handleRemoveItem(item.itemId)}
-                    className="text-red-600 hover:text-red-800 ml-2"
+                    className="text-red-600 hover:text-red-800 text-xs"
                   >
-                    Remove
+                    ×
                   </button>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="flex gap-4 mt-4">
-            <button
-              onClick={handleSync}
-              disabled={isLoading || currentSession.synced}
-              className="btn btn-primary flex-1"
-            >
-              {isLoading ? 'Syncing...' : 'Sync to Server'}
-            </button>
-            <button
-              onClick={handleExport}
-              className="btn btn-warning flex-1"
-            >
-              Export to Excel
-            </button>
-          </div>
-
           {currentSession.synced && (
-            <div className="success-message mt-4">
-              This session has been synced successfully.
+            <div className="success-message mt-2 text-sm">
+              ✓ Session synced successfully
             </div>
           )}
         </div>
