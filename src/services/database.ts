@@ -99,6 +99,20 @@ class DatabaseService {
     return sessions.filter(session => !session.synced);
   }
 
+  async getTotalQuantityForItem(itemId: string): Promise<number> {
+    const db = await this.initialize();
+    const sessions = await db.getAll('countSessions');
+    let total = 0;
+    for (const session of sessions) {
+      for (const item of session.items) {
+        if (item.itemId === itemId) {
+          total += item.quantity;
+        }
+      }
+    }
+    return total;
+  }
+
   // Settings methods
   async saveSettings(settings: AppSettings) {
     const db = await this.initialize();
@@ -116,6 +130,18 @@ class DatabaseService {
       apiBaseUrl: '',
       defaultPrintSettings: { includeBarcode: true, includePrice: true },
     };
+  }
+
+  async saveLastSyncTime(isoString: string) {
+    const db = await this.initialize();
+    const settings = await this.getSettings();
+    await db.put('settings', { ...settings, id: 'app-settings', lastSyncTime: isoString });
+  }
+
+  async getLastSyncTime(): Promise<string | null> {
+    const db = await this.initialize();
+    const settings = await db.get('settings', 'app-settings');
+    return settings && settings.lastSyncTime ? settings.lastSyncTime : null;
   }
 }
 

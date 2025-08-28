@@ -25,7 +25,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({
         <div className="item-detail">Barcode: {item.barcode}</div>
       )}
       {showPrice && (
-        <div className="item-detail">Price: ${item.price.toFixed(2)} / {item.uom}</div>
+        <div className="item-detail">Price: ${Number(item.price).toFixed(2)} / {item.uom}</div>
       )}
       <div className="item-detail">Last Updated: {new Date(item.updatedAt).toLocaleDateString()}</div>
     </div>

@@ -33,6 +33,7 @@ export interface Item {
     apiBaseUrl: string;
     defaultPrintSettings: PrintSettings;
     printerName?: string;
+    lastSyncTime?: string;
   }
   
   export interface SyncStatus {

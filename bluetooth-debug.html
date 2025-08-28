@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluetooth Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        
+        button {
+            padding: 12px 24px;
+            margin: 8px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-warning { background-color: #ffc107; color: #212529; }
+        
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .device-list {
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .device-item {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        
+        h2 {
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔵 Bluetooth Debug Test</h1>
+        <p>This page helps debug Bluetooth connectivity issues with your Gprinter GP-M322.</p>
+        
+        <div id="status" class="status info">Initializing...</div>
+        
+        <div class="section">
+            <h2>🔧 System Check</h2>
+            <button class="btn-primary" onclick="checkSystem()">Check System</button>
+            <button class="btn-warning" onclick="clearLog()">Clear Log</button>
+            <div id="systemInfo"></div>
+        </div>
+        
+        <div class="section">
+            <h2>📱 Device Discovery</h2>
+            <button class="btn-primary" onclick="discoverDevices()">Discover Devices</button>
+            <button class="btn-secondary" onclick="discoverAllDevices()">Discover All Devices</button>
+            <div id="deviceList" class="device-list" style="display: none;">
+                <h3>Found Devices:</h3>
+                <div id="devices"></div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🔗 Connection Test</h2>
+            <button class="btn-success" onclick="testConnection()">Test Connection</button>
+            <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+            <button class="btn-warning" onclick="testPrint()">Test Print</button>
+        </div>
+        
+        <div class="section">
+            <h2>📋 Debug Log</h2>
+            <div class="log" id="log"></div>
+        </div>
+        
+        <div class="section">
+            <h2>💡 Troubleshooting Tips</h2>
+            <ul>
+                <li><strong>Printer Setup:</strong> Turn ON your Gprinter GP-M322 and ensure it's in pairing mode (blinking LED)</li>
+                <li><strong>Browser:</strong> Use Chrome or Edge browser (Web Bluetooth API support required)</li>
+                <li><strong>Connection:</strong> Make sure Bluetooth is enabled on your device</li>
+                <li><strong>Security:</strong> The page must be served over HTTPS or localhost for Bluetooth to work</li>
+                <li><strong>User Gesture:</strong> Bluetooth device selection must be triggered by a direct user click</li>
+                <li><strong>Device Names:</strong> Look for devices with names starting with "GP-", "Gprinter", or "GP"</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let bluetoothDevice = null;
+        let gattServer = null;
+        let writeCharacteristic = null;
+        let discoveredDevices = [];
+        
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        const systemInfo = document.getElementById('systemInfo');
+        const deviceList = document.getElementById('deviceList');
+        const devices = document.getElementById('devices');
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            addLog(message);
+        }
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+            updateStatus('Log cleared', 'info');
+        }
+        
+        function checkSystem() {
+            addLog('=== System Check ===');
+            
+            // Check Web Bluetooth support
+            if (!navigator.bluetooth) {
+                updateStatus('❌ Web Bluetooth is NOT supported', 'error');
+                addLog('ERROR: navigator.bluetooth is undefined');
+                systemInfo.innerHTML = '<div class="error">Web Bluetooth API not available. Use Chrome or Edge browser.</div>';
+                return;
+            }
+            
+            updateStatus('✅ Web Bluetooth is supported', 'success');
+            addLog('SUCCESS: navigator.bluetooth is available');
+            
+            // Check HTTPS/localhost
+            const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isSecure) {
+                addLog('SUCCESS: Page is served over secure context (HTTPS/localhost)');
+            } else {
+                addLog('WARNING: Page is not served over secure context. Bluetooth may not work.');
+            }
+            
+            // Check user agent
+            const userAgent = navigator.userAgent;
+            addLog(`User Agent: ${userAgent}`);
+            
+            if (userAgent.includes('Chrome') || userAgent.includes('Edge')) {
+                addLog('SUCCESS: Using supported browser (Chrome/Edge)');
+            } else {
+                addLog('WARNING: Browser may not support Web Bluetooth');
+            }
+            
+            systemInfo.innerHTML = `
+                <div class="success">
+                    <strong>✅ System Check Passed</strong><br>
+                    Web Bluetooth: Available<br>
+                    Secure Context: ${isSecure ? 'Yes' : 'No'}<br>
+                    Browser: ${userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Edge') ? 'Edge' : 'Other'}
+                </div>
+            `;
+        }
+        
+        async function discoverDevices() {
+            try {
+                updateStatus('🔍 Searching for Gprinter devices...', 'info');
+                addLog('Starting device discovery with name filters...');
+                
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { namePrefix: 'GP-' },
+                        { namePrefix: 'Gprinter' },
+                        { namePrefix: 'GP' }
+                    ],
+                    optionalServices: [0xffe0, 0xff00, 0x1800]
+                });
+                
+                addLog(`✅ Device found: ${bluetoothDevice.name || 'Unknown'} (${bluetoothDevice.id})`);
+                updateStatus(`Found device: ${bluetoothDevice.name || 'Unknown'}`, 'success');
+                
+                discoveredDevices = [bluetoothDevice];
+                displayDevices();
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`❌ Device discovery failed: ${errorMessage}`, 'error');
+                addLog(`ERROR: ${errorMessage}`);
+                
+                if (error.name === 'NotFoundError') {
+                    addLog('No devices found matching the filters. Try "Discover All Devices" instead.');
+                }
+            }
+        }
+        
+        async function discoverAllDevices() {
+            try {
+                updateStatus('🔍 Searching for all Bluetooth devices...', 'info');
+                addLog('Starting broad device discovery...');
+                
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [0xffe0, 0xff00, 0x1800]
+                });
+                
+                addLog(`✅ Device found: ${bluetoothDevice.name || 'Unknown'} (${bluetoothDevice.id})`);
+                updateStatus(`Found device: ${bluetoothDevice.name || 'Unknown'}`, 'success');
+                
+                discoveredDevices = [bluetoothDevice];
+                displayDevices();
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`❌ Device discovery failed: ${errorMessage}`, 'error');
+                addLog(`ERROR: ${errorMessage}`);
+            }
+        }
+        
+        function displayDevices() {
+            if (discoveredDevices.length === 0) {
+                deviceList.style.display = 'none';
+                return;
+            }
+            
+            deviceList.style.display = 'block';
+            devices.innerHTML = '';
+            
+            discoveredDevices.forEach(device => {
+                const deviceDiv = document.createElement('div');
+                deviceDiv.className = 'device-item';
+                deviceDiv.innerHTML = `
+                    <strong>${device.name || 'Unknown Device'}</strong><br>
+                    ID: ${device.id}<br>
+                    Connected: ${device.gatt?.connected ? 'Yes' : 'No'}
+                `;
+                devices.appendChild(deviceDiv);
+            });
+        }
+        
+        async function testConnection() {
+            if (!bluetoothDevice) {
+                updateStatus('❌ No device selected. Discover devices first.', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('🔗 Connecting to device...', 'info');
+                addLog(`Connecting to ${bluetoothDevice.name}...`);
+                
+                if (!bluetoothDevice.gatt) {
+                    throw new Error('Selected device does not support GATT');
+                }
+                
+                gattServer = await bluetoothDevice.gatt.connect();
+                addLog('✅ GATT server connected');
+                
+                // Try to find a compatible service
+                const serviceUUIDs = [0xffe0, 0xff00, 0x1800];
+                let service = null;
+                
+                for (const serviceUUID of serviceUUIDs) {
+                    try {
+                        service = await gattServer.getPrimaryService(serviceUUID);
+                        addLog(`✅ Found service: 0x${serviceUUID.toString(16)}`);
+                        break;
+                    } catch (error) {
+                        addLog(`❌ Service 0x${serviceUUID.toString(16)} not found`);
+                    }
+                }
+                
+                if (!service) {
+                    throw new Error('No compatible printer service found');
+                }
+                
+                // Try to find a compatible characteristic
+                const charUUIDs = [0xffe1, 0xff01];
+                
+                for (const charUUID of charUUIDs) {
+                    try {
+                        writeCharacteristic = await service.getCharacteristic(charUUID);
+                        addLog(`✅ Found characteristic: 0x${charUUID.toString(16)}`);
+                        break;
+                    } catch (error) {
+                        addLog(`❌ Characteristic 0x${charUUID.toString(16)} not found`);
+                    }
+                }
+                
+                if (!writeCharacteristic) {
+                    throw new Error('No compatible write characteristic found');
+                }
+                
+                updateStatus(`✅ Connected to ${bluetoothDevice.name || 'Unknown'}`, 'success');
+                addLog('🎉 Connection successful!');
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`❌ Connection failed: ${errorMessage}`, 'error');
+                addLog(`ERROR: ${errorMessage}`);
+            }
+        }
+        
+        async function disconnect() {
+            try {
+                if (gattServer && gattServer.connected) {
+                    gattServer.disconnect();
+                }
+                bluetoothDevice = null;
+                gattServer = null;
+                writeCharacteristic = null;
+                updateStatus('🔌 Disconnected', 'info');
+                addLog('Disconnected from printer');
+                deviceList.style.display = 'none';
+            } catch (error) {
+                addLog(`ERROR during disconnect: ${error.message}`);
+            }
+        }
+        
+        async function testPrint() {
+            if (!writeCharacteristic) {
+                updateStatus('❌ Not connected to printer', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('🖨️ Sending test print...', 'info');
+                addLog('Sending test print...');
+                
+                // Initialize printer
+                await writeCharacteristic.writeValueWithoutResponse(new Uint8Array([0x1b, 0x40]));
+                addLog('✅ Printer initialized');
+                
+                // Print test text
+                const testText = 'Test Print\nGprinter GP-M322\n' + new Date().toLocaleString() + '\n\n\n';
+                const encoder = new TextEncoder();
+                await writeCharacteristic.writeValueWithoutResponse(encoder.encode(testText));
+                addLog('✅ Test text sent');
+                
+                // Feed and cut
+                await writeCharacteristic.writeValueWithoutResponse(new Uint8Array([0x1d, 0x56, 0x42, 0x10]));
+                addLog('✅ Feed and cut command sent');
+                
+                updateStatus('✅ Test print sent successfully', 'success');
+                addLog('🎉 Test print completed successfully!');
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`❌ Print failed: ${errorMessage}`, 'error');
+                addLog(`ERROR: ${errorMessage}`);
+            }
+        }
+        
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            updateStatus('Ready to test Bluetooth connection', 'info');
+            addLog('Page loaded. Click "Check System" to begin.');
+        });
+    </script>
+</body>
+</html>

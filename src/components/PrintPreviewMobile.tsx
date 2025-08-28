@@ -66,7 +66,7 @@ const PrintPreviewMobile: React.FC = () => {
         {settings.includePrice && (
           <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', textAlign: 'center', gap: 4 }}>
             <img src={riyalSymbol} alt="SAR" style={{ height: 18, marginRight: 4, verticalAlign: 'middle' }} />
-            <span style={{ marginLeft: 2 }}>{item.price.toFixed(2)}</span>
+            <span style={{ marginLeft: 2 }}>{Number(item.price).toFixed(2)}</span>
           </div>
         )}
       </div>

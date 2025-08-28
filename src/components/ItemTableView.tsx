@@ -96,7 +96,7 @@ export const ItemTableView: React.FC = () => {
                   {item.itemNameArabic}
                 </td>
                 <td className="px-4 py-2 border-b text-sm text-gray-600">
-                  ${item.price.toFixed(2)}
+                  ${Number(item.price).toFixed(2)}
                 </td>
                 <td className="px-4 py-2 border-b text-sm text-gray-600">
                   {item.uom}

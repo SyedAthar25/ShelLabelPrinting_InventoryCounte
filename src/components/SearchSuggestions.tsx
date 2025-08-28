@@ -64,7 +64,15 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   }
 
   return (
-    <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto">
+    <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-auto"
+      style={{
+        left: 0,
+        right: 0,
+        maxWidth: '100vw',
+        minWidth: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
       {suggestions.map((item) => (
         <div
           key={item.id}
@@ -73,7 +81,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
         >
           <div className="font-medium text-gray-900">{item.itemCode} - {item.itemNameEng}</div>
           <div className="text-sm text-gray-600">
-            Barcode: {item.barcode} | ${item.price.toFixed(2)}
+            Barcode: {item.barcode} | {Number(item.price).toFixed(2)}
           </div>
           {item.itemNameArabic && (
             <div className="text-sm text-gray-600" style={{ direction: 'rtl', fontFamily: 'Arial, sans-serif' }}>

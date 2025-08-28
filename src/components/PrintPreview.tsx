@@ -91,15 +91,24 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
               fontWeight: 'bold',
               marginTop: 4,
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'center',   // ✅ keeps vertical alignment
               justifyContent: 'center',
               width: '100%',
               textAlign: 'center',
-              gap: 4,
+              gap: 6, // small spacing
             }}
           >
-            <img src={riyalSymbol} alt="SAR" style={{ height: 18, marginRight: 4, verticalAlign: 'middle' }} />
-            <span style={{ marginLeft: 2 }}>{item.price.toFixed(2)}</span>
+            <img
+                src={riyalSymbol}
+                alt="SAR"
+                style={{
+                  height: 18,
+                  marginRight: 4,
+                  verticalAlign: 'middle',
+                  marginTop: '10px',
+                }}
+              />
+            <span>{Number(item.price).toFixed(2)}</span>
           </div>
         )}
         {/* Label size note (for preview only, not for print) */}

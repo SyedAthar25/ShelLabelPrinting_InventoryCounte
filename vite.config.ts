@@ -6,6 +6,14 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@zxing/library': '@zxing/library/esm/index.js'
+    }
+  },
+  optimizeDeps: {
+    include: ['@zxing/library', '@zxing/browser']
+  },
   server: {
     https: {
       key: fs.readFileSync('./cert.key'),
@@ -27,6 +35,14 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom']
         }
+      },
+      external: [],
+      onwarn(warning, warn) {
+        // Suppress warnings about @zxing/library
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message.includes('@zxing')) {
+          return;
+        }
+        warn(warning);
       }
     }
   },

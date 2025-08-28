@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluetooth Printer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bluetooth Printer Test</h1>
+    <p>This page helps test Bluetooth connectivity with your Gprinter GP-M322.</p>
+    
+    <div id="status" class="status info">Ready to test Bluetooth connection</div>
+    
+    <div>
+        <button class="btn-primary" onclick="testConnection()">Test Connection</button>
+        <button class="btn-secondary" onclick="disconnect()">Disconnect</button>
+        <button class="btn-success" onclick="testPrint()">Test Print</button>
+        <button class="btn-danger" onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <h3>Troubleshooting Tips:</h3>
+    <ul>
+        <li>Make sure your printer is turned ON and in pairing mode</li>
+        <li>Ensure Bluetooth is enabled on your device</li>
+        <li>Try disconnecting and reconnecting if devices don't appear</li>
+        <li>Check that you're using Chrome or Edge browser</li>
+        <li>Look for devices with names starting with "GP-", "Gprinter", or "GP"</li>
+    </ul>
+
+    <script>
+        let bluetoothDevice = null;
+        let gattServer = null;
+        let writeCharacteristic = null;
+        
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            addLog(message);
+        }
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `[${timestamp}] ${message}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+        }
+        
+        async function testConnection() {
+            try {
+                updateStatus('Checking Bluetooth support...', 'info');
+                
+                if (!navigator.bluetooth) {
+                    throw new Error('Web Bluetooth is not supported. Use Chrome or Edge browser.');
+                }
+                
+                updateStatus('Requesting Bluetooth device...', 'info');
+                
+                // Try multiple approaches to find the printer
+                try {
+                    bluetoothDevice = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { namePrefix: 'GP-' },
+                            { namePrefix: 'Gprinter' },
+                            { namePrefix: 'GP' }
+                        ],
+                        optionalServices: [0xffe0, 0xff00, 0x1800]
+                    });
+                } catch (error) {
+                    addLog('Name-based filtering failed, trying broader discovery...');
+                    bluetoothDevice = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [0xffe0, 0xff00, 0x1800]
+                    });
+                }
+                
+                addLog(`Selected device: ${bluetoothDevice.name || 'Unknown'} (${bluetoothDevice.id})`);
+                
+                if (!bluetoothDevice.gatt) {
+                    throw new Error('Selected device does not support GATT');
+                }
+                
+                updateStatus('Connecting to GATT server...', 'info');
+                gattServer = await bluetoothDevice.gatt.connect();
+                addLog('GATT server connected');
+                
+                // Try to find a compatible service
+                const serviceUUIDs = [0xffe0, 0xff00, 0x1800];
+                let service = null;
+                
+                for (const serviceUUID of serviceUUIDs) {
+                    try {
+                        service = await gattServer.getPrimaryService(serviceUUID);
+                        addLog(`Found service: 0x${serviceUUID.toString(16)}`);
+                        break;
+                    } catch (error) {
+                        addLog(`Service 0x${serviceUUID.toString(16)} not found`);
+                    }
+                }
+                
+                if (!service) {
+                    throw new Error('No compatible printer service found');
+                }
+                
+                // Try to find a compatible characteristic
+                const charUUIDs = [0xffe1, 0xff01];
+                
+                for (const charUUID of charUUIDs) {
+                    try {
+                        writeCharacteristic = await service.getCharacteristic(charUUID);
+                        addLog(`Found characteristic: 0x${charUUID.toString(16)}`);
+                        break;
+                    } catch (error) {
+                        addLog(`Characteristic 0x${charUUID.toString(16)} not found`);
+                    }
+                }
+                
+                if (!writeCharacteristic) {
+                    throw new Error('No compatible write characteristic found');
+                }
+                
+                updateStatus(`Connected to ${bluetoothDevice.name || 'Unknown'}`, 'success');
+                addLog('Connection successful!');
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`Connection failed: ${errorMessage}`, 'error');
+                addLog(`Error: ${errorMessage}`);
+                console.error('Bluetooth error:', error);
+            }
+        }
+        
+        async function disconnect() {
+            try {
+                if (gattServer && gattServer.connected) {
+                    gattServer.disconnect();
+                }
+                bluetoothDevice = null;
+                gattServer = null;
+                writeCharacteristic = null;
+                updateStatus('Disconnected', 'info');
+                addLog('Disconnected from printer');
+            } catch (error) {
+                addLog(`Disconnect error: ${error.message}`);
+            }
+        }
+        
+        async function testPrint() {
+            if (!writeCharacteristic) {
+                updateStatus('Not connected to printer', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Sending test print...', 'info');
+                
+                // Initialize printer
+                await writeCharacteristic.writeValueWithoutResponse(new Uint8Array([0x1b, 0x40]));
+                
+                // Print test text
+                const testText = 'Test Print\nGprinter GP-M322\n' + new Date().toLocaleString() + '\n\n\n';
+                const encoder = new TextEncoder();
+                await writeCharacteristic.writeValueWithoutResponse(encoder.encode(testText));
+                
+                // Feed and cut
+                await writeCharacteristic.writeValueWithoutResponse(new Uint8Array([0x1d, 0x56, 0x42, 0x10]));
+                
+                updateStatus('Test print sent successfully', 'success');
+                addLog('Test print completed');
+                
+            } catch (error) {
+                const errorMessage = error.message || 'Unknown error';
+                updateStatus(`Print failed: ${errorMessage}`, 'error');
+                addLog(`Print error: ${errorMessage}`);
+            }
+        }
+        
+        // Check if Bluetooth is supported on page load
+        window.addEventListener('load', () => {
+            if (!navigator.bluetooth) {
+                updateStatus('Web Bluetooth is not supported on this browser/device', 'error');
+            } else {
+                addLog('Web Bluetooth is supported');
+            }
+        });
+    </script>
+</body>
+</html>

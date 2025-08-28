@@ -61,7 +61,7 @@ class PrintService {
         <!-- Price -->
         ${settings.includePrice ? `
           <div style="font-size:16px;font-weight:bold;margin-top:0.5mm;display:flex;align-items:center;justify-content:center;width:100%;text-align:center;gap:4px;">
-            <img src="Saudi_Riyal_Symbol.png" alt="SAR" style="height:18px;margin-right:4px;vertical-align:middle;" />
+            <img src="Saudi_Riyal_Symbol.png" alt="SAR" style="height:18px;margin-right:4px;vertical-align:middle;margin-top:50px;" />
             <span style="margin-left:2px;">${item.price.toFixed(2)}</span>
           </div>
         ` : ''}

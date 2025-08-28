@@ -3,23 +3,90 @@ export class BluetoothPrinterService {
   private server: BluetoothRemoteGATTServer | null = null;
   private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
-  // Many BLE thermal printers expose a UART-like service/characteristic (FFE0/FFE1)
-  private static readonly SERVICE_UUID = 0xffe0;
-  private static readonly CHARACTERISTIC_UUID = 0xffe1;
+  // Common BLE thermal printer service/characteristic UUIDs
+  private static readonly SERVICE_UUIDS = [
+    0xffe0,  // Common UART service
+    0xff00,  // Alternative service
+    0x1800,  // Generic Access service
+  ];
+  
+  private static readonly CHARACTERISTIC_UUIDS = [
+    0xffe1,  // Common UART characteristic
+    0xff01,  // Alternative characteristic
+  ];
 
   async connect(): Promise<void> {
     if (!navigator.bluetooth) {
       throw new Error('Web Bluetooth is not supported on this device/browser. Use Chrome/Android.');
     }
 
-    this.device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [BluetoothPrinterService.SERVICE_UUID] }],
-      optionalServices: [BluetoothPrinterService.SERVICE_UUID]
-    });
+    console.log('Starting Bluetooth device discovery...');
+    console.log('Available services:', BluetoothPrinterService.SERVICE_UUIDS.map(uuid => '0x' + uuid.toString(16)));
 
-    this.server = await this.device.gatt!.connect();
-    const service = await this.server.getPrimaryService(BluetoothPrinterService.SERVICE_UUID);
-    this.writeCharacteristic = await service.getCharacteristic(BluetoothPrinterService.CHARACTERISTIC_UUID);
+    // Ensure we're in a secure context
+    if (!window.isSecureContext) {
+      throw new Error('Bluetooth requires a secure context (HTTPS or localhost)');
+    }
+
+    try {
+      // First try with name filter for Gprinter devices
+      console.log('Trying name-based filtering for Gprinter devices...');
+      this.device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { namePrefix: 'GP-' },
+          { namePrefix: 'Gprinter' },
+          { namePrefix: 'GP' },
+          { services: BluetoothPrinterService.SERVICE_UUIDS }
+        ],
+        optionalServices: BluetoothPrinterService.SERVICE_UUIDS
+      });
+      console.log('Device selected with name filter:', this.device.name);
+    } catch (error) {
+      // If name-based filtering fails, try with broader discovery
+      console.log('Name-based filtering failed, trying broader discovery...', error);
+      this.device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: BluetoothPrinterService.SERVICE_UUIDS
+      });
+      console.log('Device selected with broader discovery:', this.device.name);
+    }
+
+    if (!this.device.gatt) {
+      throw new Error('Selected device does not support GATT');
+    }
+
+    this.server = await this.device.gatt.connect();
+    
+    // Try to find a compatible service
+    let service: BluetoothRemoteGATTService | null = null;
+    for (const serviceUUID of BluetoothPrinterService.SERVICE_UUIDS) {
+      try {
+        service = await this.server.getPrimaryService(serviceUUID);
+        console.log(`Found service: ${serviceUUID.toString(16)}`);
+        break;
+      } catch (error) {
+        console.log(`Service ${serviceUUID.toString(16)} not found, trying next...`);
+      }
+    }
+
+    if (!service) {
+      throw new Error('No compatible printer service found. Please ensure the printer is turned on and in pairing mode.');
+    }
+
+    // Try to find a compatible characteristic
+    for (const charUUID of BluetoothPrinterService.CHARACTERISTIC_UUIDS) {
+      try {
+        this.writeCharacteristic = await service.getCharacteristic(charUUID);
+        console.log(`Found characteristic: ${charUUID.toString(16)}`);
+        break;
+      } catch (error) {
+        console.log(`Characteristic ${charUUID.toString(16)} not found, trying next...`);
+      }
+    }
+
+    if (!this.writeCharacteristic) {
+      throw new Error('No compatible write characteristic found');
+    }
   }
 
   isConnected(): boolean {
@@ -83,6 +150,49 @@ export class BluetoothPrinterService {
       await this.write(new Uint8Array([0x0a])); // LF
     }
     await this.write(new Uint8Array([0x0a, 0x0a]));
+  }
+
+  // Get device info for debugging
+  getDeviceInfo(): string {
+    if (!this.device) return 'No device connected';
+    return `Device: ${this.device.name || 'Unknown'} (${this.device.id})`;
+  }
+
+  // Check if Bluetooth is available
+  static isBluetoothAvailable(): boolean {
+    return !!(navigator.bluetooth);
+  }
+
+  // Get Bluetooth availability info
+  static getBluetoothInfo(): string {
+    if (!navigator.bluetooth) {
+      return 'Web Bluetooth not supported';
+    }
+    
+    // Check if we're on mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      return 'Web Bluetooth available (Mobile)';
+    }
+    
+    return 'Web Bluetooth available (Desktop)';
+  }
+
+  // Check if we're on a mobile device
+  static isMobileDevice(): boolean {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
+  // Get device capabilities info
+  static getDeviceCapabilities(): string {
+    const capabilities = [];
+    
+    if (navigator.bluetooth) capabilities.push('Bluetooth');
+    if (window.isSecureContext) capabilities.push('Secure Context');
+    if (this.isMobileDevice()) capabilities.push('Mobile Device');
+    
+    return capabilities.join(', ');
   }
 }
 

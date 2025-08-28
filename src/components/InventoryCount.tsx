@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Item, CountItem, CountSession } from '../types';
 import { dbService } from '../services/database';
 import { apiService } from '../services/api';
@@ -23,6 +23,43 @@ export const InventoryCount: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(''); // Add feedback state
   const [showScanner, setShowScanner] = useState(true); // New state to control scanner visibility
+  const [totalQuantities, setTotalQuantities] = useState<{ [itemId: string]: number }>({});
+  const [selectedItemTotal, setSelectedItemTotal] = useState<number | null>(null);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
+  // Fetch total quantities for all items in session
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const totals: { [itemId: string]: number } = {};
+      for (const item of currentSession.items) {
+        totals[item.itemId] = await dbService.getTotalQuantityForItem(item.itemId);
+      }
+      setTotalQuantities(totals);
+    };
+    if (currentSession.items.length > 0) {
+      fetchTotals();
+    }
+  }, [currentSession.items]);
+
+  // Fetch total quantity for the selected item
+  useEffect(() => {
+    const fetchTotal = async () => {
+      if (currentItem) {
+        const total = await dbService.getTotalQuantityForItem(currentItem.id);
+        setSelectedItemTotal(total);
+      } else {
+        setSelectedItemTotal(null);
+      }
+    };
+    fetchTotal();
+  }, [currentItem]);
 
   const handleRefresh = () => {
     setSearchInput('');
@@ -91,7 +128,7 @@ export const InventoryCount: React.FC = () => {
     }, 2000);
   };
 
-  const handleAddCount = () => {
+  const handleAddCount = async () => {
     if (!currentItem || !quantity.trim() || isNaN(parseInt(quantity))) {
       setError('Please enter a valid quantity');
       return;
@@ -127,7 +164,9 @@ export const InventoryCount: React.FC = () => {
     };
 
     setCurrentSession(updatedSession);
-    dbService.saveCountSession(updatedSession);
+    setIsLoading(true); // Disable Sync while saving
+    await dbService.saveCountSession(updatedSession);
+    setIsLoading(false);
     
     setSuccess(`Added ${qty} to ${currentItem.itemNameEng}`);
     setSearchInput('');
@@ -159,15 +198,31 @@ export const InventoryCount: React.FC = () => {
       setError('No items to sync');
       return;
     }
-
     setIsLoading(true);
     setError('');
     try {
+      // Always fetch latest settings and set API base URL
+      const settings = await dbService.getSettings();
+      if (!settings.apiBaseUrl) {
+        throw new Error('API base URL not configured');
+      }
+      apiService.setBaseUrl(settings.apiBaseUrl);
       await apiService.uploadCountSession(currentSession);
       setSuccess('Count session synced successfully!');
       setCurrentSession(prev => ({ ...prev, synced: true }));
+      // Save last sync time
+      await dbService.saveLastSyncTime(new Date().toISOString());
+      // Notify other tabs/components
+      window.dispatchEvent(new Event('sync-updated'));
     } catch (error) {
-      setError('Sync failed. Please check your connection and try again.');
+      let errorMessage = 'Sync failed. Please check your connection and try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      setError(errorMessage);
+      console.error('Sync error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -200,6 +255,7 @@ export const InventoryCount: React.FC = () => {
       {/* Search Input */}
       <div className="flex items-center gap-2 mb-2">
         <input
+          ref={searchInputRef}
           type="text"
           value={searchInput}
           onChange={(e) => {
@@ -293,6 +349,9 @@ export const InventoryCount: React.FC = () => {
               {currentItem.itemNameArabic && (
                 <div className="text-sm text-gray-600 mt-1">{currentItem.itemNameArabic}</div>
               )}
+              {selectedItemTotal !== null && (
+                <div className="text-xs text-blue-700 mt-1">Existing Quantity: {selectedItemTotal}</div>
+              )}
             </div>
           </div>
 
@@ -347,7 +406,7 @@ export const InventoryCount: React.FC = () => {
                 disabled={isLoading || currentSession.synced}
                 className="btn btn-primary text-xs px-2 py-1"
               >
-                {isLoading ? 'Syncing...' : 'Sync'}
+                {isLoading ? 'Saving...' : currentSession.synced ? 'Synced' : 'Sync'}
               </button>
               <button
                 onClick={handleExport}
@@ -364,7 +423,7 @@ export const InventoryCount: React.FC = () => {
                 <div className="flex-1">
                   <div className="font-medium text-sm">{item.itemName}</div>
                   <div className="text-xs text-gray-600">
-                    {item.itemCode} | Qty: {item.quantity}
+                    {item.itemCode} | Qty: {item.quantity} (Total: {totalQuantities[item.itemId] ?? '...'})
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

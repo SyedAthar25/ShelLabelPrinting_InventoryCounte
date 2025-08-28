@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppSettings, PrintSettings } from '../types';
 import { dbService } from '../services/database';
 import { apiService } from '../services/api';
+import { MobileBluetoothPrinterService } from '../services/mobileBluetoothPrinter';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
@@ -14,9 +15,13 @@ export const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [bluetoothInfo, setBluetoothInfo] = useState<any>(null);
 
   useEffect(() => {
     loadSettings();
+    // Load Bluetooth information
+    const info = MobileBluetoothPrinterService.getDeviceInfo();
+    setBluetoothInfo(info);
   }, []);
 
   const loadSettings = async () => {
@@ -176,6 +181,68 @@ export const Settings: React.FC = () => {
               Specify printer name for direct printing
             </p>
           </div>
+        </div>
+      )
+    },
+    {
+      title: 'Bluetooth Settings',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      ),
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      content: (
+        <div className="space-y-3">
+          {bluetoothInfo && (
+            <>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-700 mb-2">Device Information</div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div><strong>Browser:</strong> {bluetoothInfo.browser}</div>
+                  <div><strong>Platform:</strong> {bluetoothInfo.platform}</div>
+                  <div><strong>Mobile:</strong> {bluetoothInfo.isMobile ? 'Yes' : 'No'}</div>
+                  <div><strong>Bluetooth:</strong> {bluetoothInfo.hasBluetooth ? 'Supported' : 'Not Supported'}</div>
+                  <div><strong>Secure Context:</strong> {bluetoothInfo.isSecure ? 'Yes' : 'No'}</div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-sm font-medium text-gray-700 mb-2">Bluetooth Status</div>
+                <div className="text-xs text-gray-600">
+                  {MobileBluetoothPrinterService.getBluetoothStatus()}
+                </div>
+              </div>
+
+              {bluetoothInfo.platform === 'iOS' && (
+                <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-yellow-800 mb-1">iOS Limitation</div>
+                  <div className="text-xs text-yellow-700">
+                    Web Bluetooth is not supported on iOS. Please use an Android device for Bluetooth printing.
+                  </div>
+                </div>
+              )}
+
+              {!bluetoothInfo.isSecure && (
+                <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-red-800 mb-1">HTTPS Required</div>
+                  <div className="text-xs text-red-700">
+                    Bluetooth requires a secure context (HTTPS). Please access the app via HTTPS.
+                  </div>
+                </div>
+              )}
+
+              {bluetoothInfo.hasBluetooth && bluetoothInfo.isSecure && bluetoothInfo.platform !== 'iOS' && (
+                <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-green-800 mb-1">Bluetooth Ready</div>
+                  <div className="text-xs text-green-700">
+                    Your device supports Web Bluetooth and is ready for printing.
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )
     }
