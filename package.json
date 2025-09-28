@@ -5,13 +5,26 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "tailwind:build": "npx tailwindcss -i ./src/styles/App.css -o ./src/styles/tw-output.css --minify",
+        "build": "npm run tailwind:build && tsc && vite build && node inline-assets.js",
+        "build:offline": "npm run tailwind:build && tsc && vite build && node inline-assets.js",
         "preview": "vite preview",
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
     },
     "dependencies": {
+        "@awesome-cordova-plugins/bluetooth-serial": "^8.1.0",
+        "@awesome-cordova-plugins/core": "^8.1.0",
+        "@capacitor-community/bluetooth-le": "^7.2.0",
+        "@capacitor-community/http": "^1.4.1",
+        "@capacitor/android": "^7.4.3",
+        "@capacitor/cli": "^7.4.3",
+        "@capacitor/core": "^7.4.3",
+        "@capacitor/filesystem": "^7.1.4",
+        "@capacitor/share": "^7.0.2",
+        "@types/react-router-dom": "^5.3.3",
         "@zxing/browser": "^0.1.5",
         "@zxing/library": "^0.21.3",
+        "cordova-plugin-bluetooth-serial": "^0.4.7",
         "cors": "^2.8.5",
         "express": "^5.1.0",
         "html2canvas": "^1.4.1",
@@ -21,8 +34,7 @@
         "react": "^18.2.0",
         "react-barcode": "^1.6.1",
         "react-dom": "^18.2.0",
-        "react-native-bluetooth-escpos-printer": "^0.0.5",
-        "react-router-dom": "^6.8.0",
+        "react-router-dom": "^7.9.1",
         "xlsx": "^0.18.5"
     },
     "devDependencies": {
@@ -33,9 +45,12 @@
         "@typescript-eslint/eslint-plugin": "^5.54.0",
         "@typescript-eslint/parser": "^5.54.0",
         "@vitejs/plugin-react": "^3.1.0",
+        "autoprefixer": "^10.4.21",
         "eslint": "^8.35.0",
         "eslint-plugin-react-hooks": "^4.6.0",
         "eslint-plugin-react-refresh": "^0.3.4",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^3.3.3",
         "typescript": "^4.9.5",
         "vite": "^4.5.14"
     }

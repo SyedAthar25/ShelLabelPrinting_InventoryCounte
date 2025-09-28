@@ -12,7 +12,7 @@ interface SearchSuggestionsProps {
 export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   query,
   onItemSelect,
-  maxSuggestions = 5,
+  maxSuggestions = 999, // Show all matching results instead of limiting to 5
   showSuggestions
 }) => {
   const [suggestions, setSuggestions] = useState<Item[]>([]);

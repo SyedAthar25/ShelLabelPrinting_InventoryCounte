@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/database';
 import { apiService } from '../services/api';
 import { ExportUtils } from '../utils/exportUtils';
+import { ExcelImportService } from '../services/excelImport';
 
 export const Sync: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState({
@@ -14,6 +15,8 @@ export const Sync: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [lastSync, setLastSync] = useState<string>('Unknown');
+  const [importResult, setImportResult] = useState<{ success: number; errors: string[]; updated: number } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     loadStatus();
@@ -47,12 +50,6 @@ export const Sync: React.FC = () => {
     setSuccess('');
 
     try {
-      const settings = await dbService.getSettings();
-      if (!settings.apiBaseUrl) {
-        throw new Error('API base URL not configured. Please set it in Settings.');
-      }
-
-      apiService.setBaseUrl(settings.apiBaseUrl);
       const items = await apiService.downloadMasterData();
       
       setSuccess(`Downloaded ${items.length} items successfully!`);
@@ -63,8 +60,17 @@ export const Sync: React.FC = () => {
         status: 'success',
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Download failed';
+      let errorMessage = 'Download failed. Please check your connection and try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'toString' in error) {
+        errorMessage = error.toString();
+      }
       setError(errorMessage);
+      console.error('Download error:', error);
+      alert('Download failed: ' + errorMessage);
       setSyncStatus(prev => ({ ...prev, status: 'error' }));
     } finally {
       setIsLoading(false);
@@ -82,7 +88,7 @@ export const Sync: React.FC = () => {
         throw new Error('API base URL not configured');
       }
 
-      apiService.setBaseUrl(settings.apiBaseUrl);
+      apiService.setBaseUrl();
       const unsyncedSessions = await dbService.getUnsyncedSessions();
       if (unsyncedSessions.length === 0) {
         setSuccess('No pending counts to sync');
@@ -128,6 +134,47 @@ export const Sync: React.FC = () => {
       setError('Export failed');
       console.error('Export error:', error);
     }
+  };
+
+  const handleExcelImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      setError('Please select a valid Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setIsImporting(true);
+    setError('');
+    setSuccess('');
+    setImportResult(null);
+
+    try {
+      const result = await ExcelImportService.importItemsFromExcel(file);
+      setImportResult(result);
+
+      if (result.success > 0) {
+        setSuccess(`Successfully imported ${result.success} items`);
+        // Refresh status to show updated item count
+        await loadStatus();
+      }
+
+      if (result.errors.length > 0) {
+        setError(`${result.errors.length} errors occurred during import. Check details below.`);
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Import failed');
+    } finally {
+      setIsImporting(false);
+      // Clear the file input
+      event.target.value = '';
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    ExcelImportService.downloadTemplate();
   };
 
   const statusCards = [
@@ -198,7 +245,7 @@ export const Sync: React.FC = () => {
       </div>
 
       {/* Sync Options Grid */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-2 mb-4">
         {/* Master Data Download */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-3">
           <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mb-2">
@@ -233,6 +280,31 @@ export const Sync: React.FC = () => {
           >
             {isLoading ? 'Syncing...' : `Sync (${syncStatus.pendingSessions})`}
           </button>
+        </div>
+
+        {/* Excel Import */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-3">
+          <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mb-2">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div className="font-semibold text-sm text-purple-600 mb-1">Import Excel</div>
+          <div className="text-xs text-gray-500 mb-2">Add items</div>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelImport}
+            disabled={isImporting}
+            className="hidden"
+            id="excel-import-sync"
+          />
+          <label
+            htmlFor="excel-import-sync"
+            className="block w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-xs font-medium py-1 px-2 rounded transition-colors duration-200 text-center cursor-pointer"
+          >
+            {isImporting ? 'Importing...' : 'Import'}
+          </label>
         </div>
 
         {/* Export All */}
@@ -270,6 +342,50 @@ export const Sync: React.FC = () => {
           </a>
         </div>
       </div>
+
+      {/* Excel Import Section */}
+      {(isImporting || importResult) && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-semibold text-sm text-gray-800">Excel Import</h4>
+            <button
+              onClick={handleDownloadTemplate}
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
+            >
+              Template
+            </button>
+          </div>
+
+          {isImporting && (
+            <div className="flex items-center text-sm text-blue-600">
+              <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Importing items...
+            </div>
+          )}
+
+          {importResult && (
+            <div className="mt-2">
+              <div className="text-sm text-green-600">✓ {importResult.success} items processed successfully</div>
+              {importResult.updated > 0 && (
+                <div className="text-sm text-blue-600">🔄 {importResult.updated} items updated</div>
+              )}
+              {importResult.errors.length > 0 && (
+                <div className="mt-2">
+                  <div className="text-sm text-red-600">⚠ {importResult.errors.length} errors:</div>
+                  <div className="mt-1 max-h-20 overflow-y-auto">
+                    {importResult.errors.map((error, index) => (
+                      <div key={index} className="text-xs text-red-600">• {error}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       {error && (

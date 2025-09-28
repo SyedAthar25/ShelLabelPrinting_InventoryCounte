@@ -5,13 +5,12 @@ import { printService } from '../services/printService';
 import { BarcodeScanner } from './BarcodeScanner';
 import { PrintPreview } from './PrintPreview';
 import { SearchSuggestions } from './SearchSuggestions';
-import { bluetoothPrinterService, BluetoothPrinterService } from '../services/bluetoothPrinter';
 import { BluetoothConnect } from './BluetoothConnect';
 import { MobileBluetoothConnect } from './MobileBluetoothConnect';
-import { MobileBluetoothPrinterService, mobileBluetoothPrinterService } from '../services/mobileBluetoothPrinter';
-import { useNavigate } from 'react-router-dom';
+import { MobileBluetoothPrinterService } from '../services/mobileBluetoothPrinter';
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { bluetoothPrinterCapacitorService } from '../services/bluetoothPrinterCapacitor';
 
 export const ShelfLabel: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
@@ -20,16 +19,15 @@ export const ShelfLabel: React.FC = () => {
   const [printSettings, setPrintSettings] = useState<PrintSettings>({
     includeBarcode: true,
     includePrice: true,
+    labelScale: 1.0,
   });
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(true);
-  const [btStatus, setBtStatus] = useState<string>('');
 
   const printRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
 
   // Detect mobile
   const isMobile = () =>
@@ -39,11 +37,6 @@ export const ShelfLabel: React.FC = () => {
     loadDefaultSettings();
   }, []);
 
-  useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, []);
 
   const loadDefaultSettings = async () => {
     try {
@@ -92,6 +85,19 @@ export const ShelfLabel: React.FC = () => {
     handleSearch(barcode);
   };
 
+  const handleKeyboardToggle = () => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  };
+
+  // Restore autofocus on mount
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
   // ✅ Mobile PDF export
   const handleMobilePDF = async () => {
     if (!printRef.current) return;
@@ -117,6 +123,41 @@ export const ShelfLabel: React.FC = () => {
     }
 
     pdf.save("label.pdf"); // triggers download
+  };
+
+  // ✅ Bluetooth image print (prints the exact preview as image)
+  const handleBluetoothImagePrint = async () => {
+    if (!printRef.current) return;
+    try {
+      setError('');
+      const canvas = await html2canvas(printRef.current, {
+        backgroundColor: '#fff',
+        scale: 2,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+
+      // Ensure a single connection/open picker once
+      await bluetoothPrinterCapacitorService.ensureConnected();
+
+      const copies = quantity > 0 ? quantity : 1;
+      for (let i = 0; i < copies; i++) {
+        await bluetoothPrinterCapacitorService.printImageFromDataUrl(dataUrl);
+      }
+
+      // After successful print: clear input, selection and refocus
+      setSearchInput('');
+      setCurrentItem(null);
+      setQuantity(1);
+      setShowSuggestions(false);
+      setTimeout(() => {
+        if (searchInputRef.current) searchInputRef.current.focus();
+        alert('Label printed. Ready for next scan.');
+      }, 50);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Bluetooth image print failed';
+      setError(msg);
+      console.error('BT image print error:', e);
+    }
   };
 
   // ✅ Unified print handler
@@ -176,53 +217,6 @@ export const ShelfLabel: React.FC = () => {
   };
 
   // Bluetooth
-  const handleBtConnect = async (event: React.MouseEvent) => {
-    // Ensure this is triggered by a user gesture
-    event.preventDefault();
-    event.stopPropagation();
-    
-    try {
-      setBtStatus('Searching for Bluetooth devices...');
-      console.log('User clicked BT Connect button');
-      
-      // Add a small delay to ensure the user gesture is properly registered
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      await bluetoothPrinterService.connect();
-      const deviceInfo = bluetoothPrinterService.getDeviceInfo();
-      setBtStatus(`Connected to ${deviceInfo}`);
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'Bluetooth connect failed';
-      setBtStatus(`Connection failed: ${errorMessage}`);
-      console.error('Bluetooth connection error:', e);
-    }
-  };
-
-  const handleBtPrint = async () => {
-    if (!currentItem) return;
-    try {
-      const isMobile = MobileBluetoothPrinterService.isMobileDevice();
-      const service = isMobile ? mobileBluetoothPrinterService : bluetoothPrinterService;
-      
-      if (!service.isConnected()) {
-        setBtStatus('Connecting to printer...');
-        await service.connect();
-      }
-      setBtStatus('Printing...');
-      await service.printSimpleLabel({
-        title: currentItem.itemNameEng,
-        arabic: currentItem.itemNameArabic || undefined,
-        barcode: printSettings.includeBarcode ? currentItem.barcode : undefined,
-        price: printSettings.includePrice ? currentItem.price.toFixed(2) : undefined,
-      });
-      setBtStatus('Successfully printed via Bluetooth');
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'Bluetooth print failed';
-      setBtStatus(`Print failed: ${errorMessage}`);
-      console.error('Bluetooth print error:', e);
-    }
-  };
-
   const handleRefresh = () => {
     setSearchInput('');
     setShowSuggestions(false);
@@ -265,6 +259,13 @@ export const ShelfLabel: React.FC = () => {
           className="form-input flex-1"
           disabled={isLoading}
         />
+        <button
+          onClick={handleKeyboardToggle}
+          className="btn btn-secondary flex items-center justify-center p-2"
+          style={{ minWidth: 36, minHeight: 36 }}
+        >
+          ⌨️
+        </button>
         <button
           onClick={() => handleSearch()}
           disabled={isLoading || !searchInput.trim()}
@@ -355,42 +356,50 @@ export const ShelfLabel: React.FC = () => {
           </div>
 
           {/* ✅ PrintPreview wrapped for capture */}
-          <div className="mb-2" ref={printRef}>
+          <div 
+            className="mb-2" 
+            ref={printRef}
+            style={{
+              marginBottom: `${Math.max(8, ((printSettings.labelScale || 1.0) - 1) * 50)}px`
+            }}
+          >
             <PrintPreview item={currentItem} settings={printSettings} />
           </div>
 
           <div className="flex gap-2 w-full justify-center mb-1">
             <button onClick={handleDirectPrint} className="btn btn-success">Print</button>
+            <button onClick={handleBluetoothImagePrint} className="btn btn-primary">BT Print Label</button>
           </div>
           
           {MobileBluetoothPrinterService.isMobileDevice() ? (
             <MobileBluetoothConnect 
               onConnectionChange={(connected) => {
                 if (!connected) {
-                  setBtStatus('Disconnected');
+                  // setBtStatus('Disconnected'); // Removed unused: setBtStatus
                 }
               }}
-              onError={(error) => {
-                setBtStatus(`Error: ${error}`);
+              onError={() => {
+                setError('Error');
               }}
               onPrint={() => {
-                setBtStatus('Print successful via mobile Bluetooth');
+                // setBtStatus('Print successful via mobile Bluetooth'); // Removed unused: setBtStatus
               }}
             />
           ) : (
             <BluetoothConnect 
               onConnectionChange={(connected) => {
                 if (!connected) {
-                  setBtStatus('Disconnected');
+                  // setBtStatus('Disconnected'); // Removed unused: setBtStatus
                 }
               }}
-              onError={(error) => {
-                setBtStatus(`Error: ${error}`);
+              onError={() => {
+                setError('Error');
               }}
             />
           )}
         </div>
       )}
+
     </div>
   );
 };

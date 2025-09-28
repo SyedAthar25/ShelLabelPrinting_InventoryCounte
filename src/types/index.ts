@@ -12,13 +12,16 @@ export interface Item {
   export interface PrintSettings {
     includeBarcode: boolean;
     includePrice: boolean;
+    labelScale?: number; // Overall scale factor for the entire label (0.5 to 2.0)
   }
   
   export interface CountSession {
     id: string;
     date: string;
+    location?: string;
     items: CountItem[];
     synced: boolean;
+    completed?: boolean;
   }
   
   export interface CountItem {

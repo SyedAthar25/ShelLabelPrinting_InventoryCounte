@@ -14,8 +14,9 @@ interface PrintPreviewProps {
 export const PrintPreview: React.FC<PrintPreviewProps> = ({
   item,
   settings,
-  // quantity, // Removed unused prop
 }) => {
+  const scale = settings.labelScale || 1.0;
+  
   return (
     <div className="card" style={{ display: 'flex', justifyContent: 'center' }}>
       <div
@@ -24,13 +25,15 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
           width: '60mm',
           height: '40mm',
           padding: '5px',
-          border: 'none', // Remove border
+          border: 'none',
           background: '#fff',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto',
+          transform: `scale(${scale})`,
+          transformOrigin: 'center',
         }}
       >
         {/* Logo - large and centered, no lines */}
@@ -91,11 +94,11 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
               fontWeight: 'bold',
               marginTop: 4,
               display: 'flex',
-              alignItems: 'center',   // ✅ keeps vertical alignment
+              alignItems: 'center',
               justifyContent: 'center',
               width: '100%',
               textAlign: 'center',
-              gap: 6, // small spacing
+              gap: 6,
             }}
           >
             <img
@@ -111,10 +114,6 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
             <span>{Number(item.price).toFixed(2)}</span>
           </div>
         )}
-        {/* Label size note (for preview only, not for print) */}
-        {/*  <div style={{ fontSize: '10px', marginTop: 2, color: '#888', textAlign: 'center' }}>
-          Label Size : 6cm x 4cm
-        </div> */}
       </div>
     </div>
   );

@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Item, CountItem, CountSession } from '../types';
 import { dbService } from '../services/database';
 import { apiService } from '../services/api';
 import { ExportUtils } from '../utils/exportUtils';
 import { BarcodeScanner } from './BarcodeScanner';
-import { ItemCard } from './ItemCard';
 import { SearchSuggestions } from './SearchSuggestions';
 
 export const InventoryCount: React.FC = () => {
@@ -25,14 +24,13 @@ export const InventoryCount: React.FC = () => {
   const [showScanner, setShowScanner] = useState(true); // New state to control scanner visibility
   const [totalQuantities, setTotalQuantities] = useState<{ [itemId: string]: number }>({});
   const [selectedItemTotal, setSelectedItemTotal] = useState<number | null>(null);
+  const [locations, setLocations] = useState<{ id: string; name: string; createdAt: string }[]>([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<{ id: string; name: string } | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, []);
 
   // Fetch total quantities for all items in session
   useEffect(() => {
@@ -65,7 +63,7 @@ export const InventoryCount: React.FC = () => {
     setSearchInput('');
     setShowSuggestions(false);
     setCurrentItem(null);
-    setQuantity('');
+    setQuantity(''); // Clear quantity on refresh
     setError('');
     setSuccess('');
     setShowScanner(true); // Show scanner again when refreshing
@@ -98,11 +96,12 @@ export const InventoryCount: React.FC = () => {
         if (existingItem) {
           setQuantity(existingItem.quantity.toString());
         } else {
-          setQuantity('');
+          setQuantity(''); // Always start with empty quantity for new items
         }
       } else {
         setError('Item not found. Please check the barcode or item code.');
         setCurrentItem(null);
+        setQuantity(''); // Clear quantity when item not found
       }
     } catch (error) {
       setError('Error searching for item');
@@ -128,7 +127,52 @@ export const InventoryCount: React.FC = () => {
     }, 2000);
   };
 
+  const handleKeyboardToggle = () => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  };
+
+  // Restore autofocus on mount
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
+
+  // Load locations and persisted location on mount
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const locs = await dbService.getLocations();
+        setLocations(locs);
+
+        // Load persisted location
+        const persistedLocation = localStorage.getItem('selectedLocation');
+        if (persistedLocation) {
+          const locationData = JSON.parse(persistedLocation);
+          setSelectedLocation(locationData);
+          setCurrentSession(prev => ({
+            ...prev,
+            location: locationData.name,
+          }));
+        } else {
+          // Show location modal if no location selected
+          setShowLocationModal(true);
+        }
+      } catch (error) {
+        console.error('Error loading locations:', error);
+      }
+    };
+    loadLocations();
+  }, []);
+
   const handleAddCount = async () => {
+    if (!selectedLocation) {
+      setError('Please select a location first');
+      return;
+    }
+
     if (!currentItem || !quantity.trim() || isNaN(parseInt(quantity))) {
       setError('Please enter a valid quantity');
       return;
@@ -172,7 +216,12 @@ export const InventoryCount: React.FC = () => {
     setSearchInput('');
     setCurrentItem(null);
     setQuantity('');
-    
+    // Refocus for next scan
+    setTimeout(() => {
+      if (searchInputRef.current) searchInputRef.current.focus();
+      alert('Added to count. Ready for next scan.');
+    }, 50);
+
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -206,7 +255,7 @@ export const InventoryCount: React.FC = () => {
       if (!settings.apiBaseUrl) {
         throw new Error('API base URL not configured');
       }
-      apiService.setBaseUrl(settings.apiBaseUrl);
+      apiService.setBaseUrl();
       await apiService.uploadCountSession(currentSession);
       setSuccess('Count session synced successfully!');
       setCurrentSession(prev => ({ ...prev, synced: true }));
@@ -238,21 +287,130 @@ export const InventoryCount: React.FC = () => {
     setSuccess('Exported to Excel successfully!');
   };
 
+  const handleLocationSelect = (location: { id: string; name: string }) => {
+    setSelectedLocation(location);
+    localStorage.setItem('selectedLocation', JSON.stringify(location));
+    setCurrentSession(prev => ({
+      ...prev,
+      location: location.name,
+    }));
+    setShowLocationModal(false);
+    setLocationInput('');
+    setError('');
+    setSuccess(`Location set to: ${location.name}`);
+  };
+
+  const handleLocationSubmit = () => {
+    if (!locationInput.trim()) {
+      setError('Please enter a location name');
+      return;
+    }
+
+    const trimmedInput = locationInput.trim();
+    const existingLocation = locations.find(loc =>
+      loc.name.toLowerCase() === trimmedInput.toLowerCase()
+    );
+
+    if (existingLocation) {
+      handleLocationSelect(existingLocation);
+    } else {
+      setError('Location not found. Please select from existing locations or add it in Settings.');
+    }
+  };
+
+  const handleChangeLocation = () => {
+    setShowLocationModal(true);
+    setLocationInput('');
+    setError('');
+  };
+
+  const handleCompleteLocation = async () => {
+    if (!selectedLocation) {
+      setError('Please select a location first');
+      return;
+    }
+
+    try {
+      const updatedSession: CountSession = {
+        ...currentSession,
+        completed: true,
+      };
+
+      await dbService.saveCountSession(updatedSession);
+      setCurrentSession(updatedSession);
+      setSuccess(`Location "${selectedLocation.name}" inventory completed!`);
+
+      // Clear persisted location and reset for next location
+      localStorage.removeItem('selectedLocation');
+      setTimeout(() => {
+        setCurrentSession({
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          items: [],
+          synced: false,
+        });
+        setSelectedLocation(null);
+        setSuccess('');
+        setShowLocationModal(true); // Show modal for next location
+      }, 2000);
+    } catch (error) {
+      setError('Failed to complete location inventory');
+      console.error('Error completing location:', error);
+    }
+  };
+
   const totalItems = currentSession.items.reduce((sum, item) => sum + item.quantity, 0);
   const uniqueItems = currentSession.items.length;
 
   return (
     <div className="p-4">
-      <div className="flex items-center mb-6 gap-2">
-        <h2 className="text-2xl font-bold m-0">Inventory Count</h2>
-        <button onClick={handleRefresh} className="p-2 ml-2 text-blue-600 hover:text-blue-800 focus:outline-none" title="Refresh">
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-2xl font-bold m-0">Inventory Count</h2>
+          <button onClick={handleRefresh} className="p-2 ml-2 text-blue-600 hover:text-blue-800 focus:outline-none" title="Refresh">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Location Controls - Right after heading */}
+        <div className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2">
+            {selectedLocation ? (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-lg">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="font-medium">{selectedLocation.name}</span>
+              </div>
+            ) : (
+              <div className="text-red-600 font-medium">⚠️ No location selected - Inventory disabled</div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleChangeLocation}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200"
+            >
+              {selectedLocation ? 'Change Location' : 'Select Location'}
+            </button>
+
+            {selectedLocation && (
+              <button
+                onClick={handleCompleteLocation}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors duration-200"
+              >
+                Complete Location
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Search Input */}
+      {/* Search Input - Disabled when no location selected */}
       <div className="flex items-center gap-2 mb-2">
         <input
           ref={searchInputRef}
@@ -270,15 +428,23 @@ export const InventoryCount: React.FC = () => {
               setShowSuggestions(false);
             }
           }}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Enter barcode/item code/Item Name"
-          className="form-input flex-1"
-          disabled={isLoading}
+          onKeyPress={(e) => e.key === 'Enter' && selectedLocation && handleSearch()}
+          placeholder={selectedLocation ? "Enter barcode/item code/Item Name" : "Select a location first"}
+          className={`form-input flex-1 ${!selectedLocation ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          disabled={isLoading || !selectedLocation}
         />
         <button
+          onClick={handleKeyboardToggle}
+          disabled={!selectedLocation}
+          className={`btn btn-secondary flex items-center justify-center p-2 ${!selectedLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+          style={{ minWidth: 36, minHeight: 36 }}
+        >
+          ⌨️
+        </button>
+        <button
           onClick={() => handleSearch()}
-          disabled={isLoading || !searchInput.trim()}
-          className="btn btn-primary flex items-center justify-center p-2"
+          disabled={isLoading || !searchInput.trim() || !selectedLocation}
+          className={`btn btn-primary flex items-center justify-center p-2 ${!selectedLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{ minWidth: 36, minHeight: 36 }}
         >
           {isLoading ? (
@@ -292,15 +458,15 @@ export const InventoryCount: React.FC = () => {
       <SearchSuggestions
         query={searchInput}
         showSuggestions={showSuggestions}
-        onItemSelect={(item) => {
+        onItemSelect={(item: Item) => {
           setCurrentItem(item);
           setSearchInput(item.itemCode);
           setShowSuggestions(false);
         }}
       />
 
-      {/* Barcode Scanner - minimal space */}
-      {showScanner && (
+      {/* Barcode Scanner - disabled when no location selected */}
+      {selectedLocation && showScanner && (
         <details className="mb-2">
           <summary className="cursor-pointer font-semibold text-blue-600">Use Camera Scanner</summary>
           <div className="mt-1">
@@ -312,14 +478,19 @@ export const InventoryCount: React.FC = () => {
           </div>
         </details>
       )}
-      {!showScanner && (
+      {selectedLocation && !showScanner && (
         <div className="mb-2">
-          <button 
-            onClick={() => setShowScanner(true)} 
+          <button
+            onClick={() => setShowScanner(true)}
             className="btn btn-secondary text-sm"
           >
             📷 Scan Another Item
           </button>
+        </div>
+      )}
+      {!selectedLocation && (
+        <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-700">📷 Camera scanner will be available after selecting a location</p>
         </div>
       )}
 
@@ -418,27 +589,37 @@ export const InventoryCount: React.FC = () => {
           </div>
 
           <div className="max-h-60 overflow-y-auto">
-            {currentSession.items.map((item, index) => (
-              <div key={item.itemId} className="flex items-center justify-between p-2 border-b border-gray-200">
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{item.itemName}</div>
-                  <div className="text-xs text-gray-600">
-                    {item.itemCode} | Qty: {item.quantity} (Total: {totalQuantities[item.itemId] ?? '...'})
+            {(() => {
+              // Show only the most recently changed item
+              const sortedItems = [...currentSession.items].sort((a, b) => 
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+              );
+              const lastItem = sortedItems[0];
+              
+              if (!lastItem) return null;
+              
+              return (
+                <div key={lastItem.itemId} className="flex items-center justify-between p-2 border-b border-gray-200">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{lastItem.itemName}</div>
+                    <div className="text-xs text-gray-600">
+                      {lastItem.itemCode} | Qty: {lastItem.quantity} (Total: {totalQuantities[lastItem.itemId] ?? '...'})
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">
+                      {new Date(lastItem.timestamp).toLocaleTimeString()}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveItem(lastItem.itemId)}
+                      className="text-red-600 hover:text-red-800 text-xs"
+                    >
+                      ×
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
-                    {new Date(item.timestamp).toLocaleTimeString()}
-                  </span>
-                  <button
-                    onClick={() => handleRemoveItem(item.itemId)}
-                    className="text-red-600 hover:text-red-800 text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })()}
           </div>
 
           {currentSession.synced && (
@@ -448,6 +629,72 @@ export const InventoryCount: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Location Selection Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Select Location</h3>
+
+            {/* Location Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Enter Location Name:</label>
+              <input
+                type="text"
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                placeholder="Type location name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onKeyPress={(e) => e.key === 'Enter' && handleLocationSubmit()}
+                autoFocus
+              />
+              <button
+                onClick={handleLocationSubmit}
+                disabled={!locationInput.trim()}
+                className="w-full mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium rounded-lg transition-colors duration-200"
+              >
+                Select Location
+              </button>
+            </div>
+
+            {/* Existing Locations */}
+            {locations.length > 0 && (
+              <div className="border-t border-gray-200 pt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Or select from existing locations:</h4>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {locations.map((location) => (
+                    <button
+                      key={location.id}
+                      onClick={() => handleLocationSelect(location)}
+                      className="w-full text-left px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                    >
+                      {location.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Info Message */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                To add new locations, go to Settings → Location Management.
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors duration-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

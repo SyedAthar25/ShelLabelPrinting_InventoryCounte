@@ -2,11 +2,10 @@ import { Item, CountSession } from '../types';
 import { dbService } from './database';
 
 class ApiService {
-  private baseUrl: string = '';
+  private baseUrl: string = 'http://192.168.31.57:5000'; // Hardcoded for testing against .NET API
 
-  setBaseUrl(url: string) {
-    this.baseUrl = url;
-  }
+  // setBaseUrl is now a no-op since we hardcode the baseUrl
+  setBaseUrl() {}
 
   async downloadMasterData(): Promise<Item[]> {
     if (!this.baseUrl) {
@@ -14,11 +13,13 @@ class ApiService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/items`);
+      const itemsUrl = `${this.baseUrl}/api/items`;
+      const response = await fetch(itemsUrl);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const text = await response.text().catch(() => '');
+        throw new Error(`API error ${response.status}: ${text || 'Unable to fetch items'} (${itemsUrl})`);
       }
-      
+
       const items: Item[] = await response.json();
       await dbService.saveItems(items);
       return items;
@@ -43,7 +44,14 @@ class ApiService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = '[Could not read response body]';
+        }
+        console.error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
       // Mark session as synced

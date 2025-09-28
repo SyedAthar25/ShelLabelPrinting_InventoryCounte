@@ -119,9 +119,8 @@ const TestDataButton: React.FC = () => {
   const clearTestData = async () => {
     if (window.confirm('Are you sure you want to clear all data from the database? This cannot be undone.')) {
       try {
-        // This is a simplified clear - in a real app you'd implement proper clearing
-        await dbService.saveItems([]);
-        alert('Database cleared successfully!');
+        await dbService.clearAllData();
+        alert('All app data cleared successfully!');
       } catch (error) {
         console.error('Error clearing data:', error);
         alert('Failed to clear data.');

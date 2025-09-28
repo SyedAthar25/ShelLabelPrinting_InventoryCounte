@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { bluetoothPrinterService, BluetoothPrinterService } from '../services/bluetoothPrinter';
+import { bluetoothPrinterCapacitorService } from '../services/bluetoothPrinterCapacitor';
 
 interface BluetoothConnectProps {
   onConnectionChange?: (connected: boolean) => void;
@@ -17,49 +17,23 @@ export const BluetoothConnect: React.FC<BluetoothConnectProps> = ({
 
   // Check connection status on mount
   React.useEffect(() => {
-    const checkConnection = () => {
-      const connected = bluetoothPrinterService.isConnected();
-      setIsConnected(connected);
-      if (connected) {
-        setStatus(`Connected to ${bluetoothPrinterService.getDeviceInfo()}`);
-      }
-    };
-    
-    checkConnection();
-    // Check periodically
-    const interval = setInterval(checkConnection, 2000);
-    return () => clearInterval(interval);
+    setIsConnected(bluetoothPrinterCapacitorService.isConnected());
   }, []);
 
   const handleConnect = useCallback(async (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
     if (isConnecting) return;
-    
     setIsConnecting(true);
-    setStatus('Searching for Bluetooth devices...');
-    
+    setStatus('Searching for Gprinter devices...');
     try {
-      console.log('User clicked BT Connect button');
-      
-      // Use a more direct approach for mobile compatibility
-      const connectPromise = bluetoothPrinterService.connect();
-      
-      // Add a small delay to ensure the user gesture is properly registered
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      await connectPromise;
-      
-      const deviceInfo = bluetoothPrinterService.getDeviceInfo();
-      setStatus(`Connected to ${deviceInfo}`);
+      await bluetoothPrinterCapacitorService.scanAndConnect();
+      setStatus('Connected to Gprinter');
       setIsConnected(true);
       onConnectionChange?.(true);
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Bluetooth connect failed';
       setStatus(`Connection failed: ${errorMessage}`);
-      console.error('Bluetooth connection error:', error);
       onError?.(errorMessage);
     } finally {
       setIsConnecting(false);
@@ -68,24 +42,23 @@ export const BluetoothConnect: React.FC<BluetoothConnectProps> = ({
 
   const handleDisconnect = useCallback(async () => {
     try {
-      await bluetoothPrinterService.disconnect();
+      await bluetoothPrinterCapacitorService.disconnect();
       setStatus('Disconnected');
       setIsConnected(false);
       onConnectionChange?.(false);
     } catch (error) {
-      console.error('Disconnect error:', error);
+      onError?.('Disconnect error');
     }
-  }, [onConnectionChange]);
+  }, [onConnectionChange, onError]);
 
   const handlePrint = useCallback(async () => {
     if (!isConnected) {
       setStatus('Not connected to printer');
       return;
     }
-    
     try {
       setStatus('Printing...');
-      await bluetoothPrinterService.printText(['Test Print', 'Gprinter GP-M322', new Date().toLocaleString()]);
+      await bluetoothPrinterCapacitorService.printText(['Test Print', 'Gprinter', new Date().toLocaleString()]);
       setStatus('Print successful');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Print failed';
@@ -106,7 +79,6 @@ export const BluetoothConnect: React.FC<BluetoothConnectProps> = ({
         >
           {isConnecting ? 'Connecting...' : isConnected ? 'Reconnect' : 'BT Connect'}
         </button>
-        
         {isConnected && (
           <>
             <button
@@ -126,11 +98,6 @@ export const BluetoothConnect: React.FC<BluetoothConnectProps> = ({
           </>
         )}
       </div>
-      
-      <div className="text-xs text-gray-500 mb-1">
-        Bluetooth: {BluetoothPrinterService.getBluetoothInfo()}
-      </div>
-      
       {status && (
         <div className={`text-xs ${status.includes('failed') || status.includes('error') ? 'text-red-600' : 'text-gray-600'}`}>
           {status}

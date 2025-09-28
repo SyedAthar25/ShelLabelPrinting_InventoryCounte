@@ -19,7 +19,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   const [feedback, setFeedback] = useState<string>('');
   const feedbackTimeout = useRef<number | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -45,7 +44,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
       const canvas = canvasRef.current;
       const needsInit = !video || !canvas || !video.srcObject || (video.srcObject instanceof MediaStream && video.srcObject.getVideoTracks().length === 0);
       if (needsInit) {
-        await barcodeScanner.initializeScanner(video!, canvas!);
+        await barcodeScanner.initializeScanner(video!);
       }
       let fallbackTried = false;
       let barcodeDetected = false; // Flag to prevent multiple detections
@@ -79,7 +78,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           try {
             const codeReader = new BrowserMultiFormatReader();
             zxingReaderRef.current = codeReader;
-            codeReader.decodeFromVideoElement(video, (result, error) => {
+            codeReader.decodeFromVideoElement(video, (result) => {
               if (result && !barcodeDetected) {
                 barcodeDetected = true;
                 setFeedback('Barcode detected!');
@@ -90,19 +89,16 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           } catch (e) {
             setFeedback('No barcode detected. Try manual entry or upload.');
             setShowManualEntry(true);
-            setShowUpload(true);
           }
         } else {
           setFeedback('No barcode detected. Try manual entry or upload.');
           setShowManualEntry(true);
-          setShowUpload(true);
         }
       }, 2000); // Reduced from 5000ms to 2000ms for faster fallback
     } catch (error) {
       onError?.(error instanceof Error ? error.message : 'Failed to initialize scanner');
       setFeedback('Camera error');
       setShowManualEntry(true);
-      setShowUpload(true);
     }
   };
 

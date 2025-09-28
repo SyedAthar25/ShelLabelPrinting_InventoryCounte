@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Item, CountSession, AppSettings, PrintSettings } from '../types';
+import { Item, CountSession, AppSettings } from '../types';
 
 interface AppDatabase extends DBSchema {
   items: {
@@ -10,6 +10,10 @@ interface AppDatabase extends DBSchema {
   countSessions: {
     key: string;
     value: CountSession;
+  };
+  locations: {
+    key: string;
+    value: { id: string; name: string; createdAt: string };
   };
   settings: {
     key: string;
@@ -22,22 +26,143 @@ class DatabaseService {
 
   async initialize(): Promise<IDBPDatabase<AppDatabase>> {
     if (!this.db) {
-      this.db = await openDB<AppDatabase>('shelf-inventory-db', 1, {
-        upgrade(db) {
-          // Create items store
-          const itemsStore = db.createObjectStore('items', { keyPath: 'id' });
-          itemsStore.createIndex('by-barcode', 'barcode');
-          itemsStore.createIndex('by-code', 'itemCode');
+      this.db = await openDB<AppDatabase>('shelf-inventory-db', 2, {
+        upgrade(db, oldVersion, _newVersion) {
+          // Version 1 stores
+          if (oldVersion < 1) {
+            // Create items store
+            const itemsStore = db.createObjectStore('items', { keyPath: 'id' });
+            itemsStore.createIndex('by-barcode', 'barcode');
+            itemsStore.createIndex('by-code', 'itemCode');
 
-          // Create count sessions store
-          db.createObjectStore('countSessions', { keyPath: 'id' });
+            // Create count sessions store
+            db.createObjectStore('countSessions', { keyPath: 'id' });
 
-          // Create settings store
-          db.createObjectStore('settings', { keyPath: 'id' });
+            // Create settings store
+            db.createObjectStore('settings', { keyPath: 'id' });
+          }
+
+          // Version 2 additions
+          if (oldVersion < 2) {
+            // Create locations store
+            db.createObjectStore('locations', { keyPath: 'id' });
+          }
         },
       });
+      // Removed auto-seed sample data for offline installations per user request
+      // await this.autoSeedSampleData();
     }
     return this.db;
+  }
+
+  // Removed autoSeedSampleData method as it is no longer used per user request
+
+  private async seedSampleData(): Promise<void> {
+    const sampleItems: Item[] = [
+      {
+        id: '1',
+        itemCode: 'BEV001',
+        barcode: '6901234567890',
+        itemNameEng: 'Mineral Water 500ml',
+        itemNameArabic: 'مياه معدنية 500 مل',
+        price: 1.50,
+        uom: 'bottle',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        itemCode: 'BEV002',
+        barcode: '6901234567891',
+        itemNameEng: 'Apple Juice 1L',
+        itemNameArabic: 'عصير تفاح 1 لتر',
+        price: 3.75,
+        uom: 'bottle',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '3',
+        itemCode: 'SNK001',
+        barcode: '6901234567892',
+        itemNameEng: 'Potato Chips 150g',
+        itemNameArabic: 'رقائق البطاطس 150 جرام',
+        price: 2.25,
+        uom: 'pack',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '4',
+        itemCode: 'SNK002',
+        barcode: '6901234567893',
+        itemNameEng: 'Chocolate Bar 100g',
+        itemNameArabic: 'شوكولاتة 100 جرام',
+        price: 4.50,
+        uom: 'bar',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '5',
+        itemCode: 'DAI001',
+        barcode: '6901234567894',
+        itemNameEng: 'Fresh Milk 1L',
+        itemNameArabic: 'حليب طازج 1 لتر',
+        price: 5.25,
+        uom: 'bottle',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '6',
+        itemCode: 'DAI002',
+        barcode: '6901234567895',
+        itemNameEng: 'Yogurt 500g',
+        itemNameArabic: 'زبادي 500 جرام',
+        price: 3.25,
+        uom: 'cup',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '7',
+        itemCode: 'CLN001',
+        barcode: '6901234567896',
+        itemNameEng: 'Hand Soap 250ml',
+        itemNameArabic: 'صابون اليد 250 مل',
+        price: 6.75,
+        uom: 'bottle',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '8',
+        itemCode: 'CLN002',
+        barcode: '6901234567897',
+        itemNameEng: 'Laundry Detergent 2L',
+        itemNameArabic: 'منظف الغسيل 2 لتر',
+        price: 12.99,
+        uom: 'bottle',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '9',
+        itemCode: 'BKY001',
+        barcode: '6901234567898',
+        itemNameEng: 'White Bread 400g',
+        itemNameArabic: 'خبز ابيض 400 جرام',
+        price: 2.50,
+        uom: 'loaf',
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: '10',
+        itemCode: 'BKY002',
+        barcode: '6901234567899',
+        itemNameEng: 'Croissant Pack 6pcs',
+        itemNameArabic: 'كرواسون 6 قطع',
+        price: 8.25,
+        uom: 'pack',
+        updatedAt: new Date().toISOString(),
+      }
+    ];
+
+    await this.saveItems(sampleItems);
+    console.log(`Auto-seeded ${sampleItems.length} sample items for offline use`);
   }
 
   // Item methods
@@ -48,6 +173,17 @@ class DatabaseService {
       await tx.store.put(item);
     }
     await tx.done;
+  }
+
+  async clearAllData() {
+    const db = await this.initialize();
+    const tx = db.transaction(['items', 'countSessions', 'settings', 'locations'], 'readwrite');
+    await tx.db.clear('items');
+    await tx.db.clear('countSessions');
+    await tx.db.clear('locations');
+    await tx.db.clear('settings');
+    await tx.done;
+    localStorage.removeItem('app-seeded-sample-data');
   }
 
   async getItemByBarcode(barcode: string): Promise<Item | undefined> {
@@ -142,6 +278,50 @@ class DatabaseService {
     const db = await this.initialize();
     const settings = await db.get('settings', 'app-settings');
     return settings && settings.lastSyncTime ? settings.lastSyncTime : null;
+  }
+
+  // Force seed sample data (for manual seeding)
+  async forceSeedSampleData(): Promise<void> {
+    try {
+      await this.seedSampleData();
+      localStorage.setItem('app-seeded-sample-data', 'true');
+      console.log('Sample data force-seeded successfully');
+    } catch (error) {
+      console.error('Error force-seeding sample data:', error);
+      throw error;
+    }
+  }
+
+  // Check if database needs seeding
+  async needsSeeding(): Promise<boolean> {
+    try {
+      const itemCount = await this.getItemsCount();
+      return itemCount === 0;
+    } catch (error) {
+      console.error('Error checking if seeding needed:', error);
+      return true; // Assume needs seeding if we can't check
+    }
+  }
+
+  // Location methods
+  async saveLocation(location: { id: string; name: string; createdAt: string }) {
+    const db = await this.initialize();
+    await db.put('locations', location);
+  }
+
+  async getLocations(): Promise<{ id: string; name: string; createdAt: string }[]> {
+    const db = await this.initialize();
+    return db.getAll('locations');
+  }
+
+  async deleteLocation(id: string) {
+    const db = await this.initialize();
+    await db.delete('locations', id);
+  }
+
+  async getLocationById(id: string): Promise<{ id: string; name: string; createdAt: string } | undefined> {
+    const db = await this.initialize();
+    return db.get('locations', id);
   }
 }
 

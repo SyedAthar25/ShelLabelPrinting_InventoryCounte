@@ -2,10 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { inlineAssetsPlugin } from './vite-plugin-inline-assets.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), inlineAssetsPlugin()],
   resolve: {
     alias: {
       '@zxing/library': '@zxing/library/esm/index.js'
@@ -31,10 +32,10 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom']
-        }
+        manualChunks: undefined, // Disable chunking for better offline support
+        assetFileNames: 'assets/[name].[ext]',
+        chunkFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/[name].js'
       },
       external: [],
       onwarn(warning, warn) {

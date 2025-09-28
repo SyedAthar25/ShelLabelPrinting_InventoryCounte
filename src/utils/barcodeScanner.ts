@@ -1,16 +1,12 @@
 class BarcodeScanner {
     private videoElement: HTMLVideoElement | null = null;
-    private canvasElement: HTMLCanvasElement | null = null;
-    private context: CanvasRenderingContext2D | null = null;
     private isScanning: boolean = false;
     private barcodeDetector: any | null = null;
     private lastDetectedValue: string | null = null;
     private lastEmitTimeMs: number = 0;
 
-    async initializeScanner(videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) {
+    async initializeScanner(videoElement: HTMLVideoElement) {
       this.videoElement = videoElement;
-      this.canvasElement = canvasElement;
-      this.context = canvasElement.getContext('2d');
 
       try {
         // Prefer built-in BarcodeDetector when available (fast on mobile Chrome)

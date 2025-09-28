@@ -26,22 +26,7 @@
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="/icons/icon-32x32.svg" />
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="/icons/icon-16x16.svg" />
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#2563eb',
-              secondary: '#64748b',
-              success: '#22c55e',
-              warning: '#f59e0b',
-              danger: '#ef4444'
-            }
-          }
-        }
-      }
-    </script>
+    <!-- Tailwind CSS will be included via Vite build -->
   </head>
   <body>
     <div id="root"></div>
@@ -54,7 +39,8 @@
       window.__VITE_HMR_PORT__ = 3000;
     </script>
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration (DISABLED FOR DEBUGGING) -->
+    <!--
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -68,5 +54,6 @@
         });
       }
     </script>
+    -->
   </body>
 </html>

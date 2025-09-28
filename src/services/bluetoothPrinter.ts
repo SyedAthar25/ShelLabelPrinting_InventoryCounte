@@ -104,7 +104,7 @@ export class BluetoothPrinterService {
 
   private async write(data: Uint8Array): Promise<void> {
     if (!this.writeCharacteristic) throw new Error('Printer is not connected');
-    await this.writeCharacteristic.writeValueWithoutResponse(data);
+    await this.writeCharacteristic.writeValueWithoutResponse(new Uint8Array(data));
   }
 
   // Basic ESC/POS helpers (works for many 58/80mm thermal printers)
